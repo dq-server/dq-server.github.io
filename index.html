@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Start Minecraft</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      text-align: center;
+      padding: 20vh 20px 20px 20px;
+      box-sizing: border-box;
+    }
+
+    body, label, input, button, #result {
+      background-color: #444;
+      color: white;
+      font-size: 30px;
+      font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    label { font-size: 40px; }
+    #result { font-size: 24px; }
+
+    button { border: none; padding: 0; cursor: pointer; }
+    #grass { max-width: 100px; }
+  </style>
+</head>
+<body>
+  <form id="start-minecraft">
+    <p><label for="aws-key">Enter the key to start the server</label></p>
+    <p><input id="aws-key" type="text" autocomplete="off" /></p>
+    <p><button><img id="grass" src="./grass.jpg" /></button></p>
+  </form>
+  <p id="result"></p>
+
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.502.0.min.js"></script>
+  <script>
+    document.querySelector("#start-minecraft").addEventListener("submit", e => {
+      e.preventDefault()
+
+      const [id, secret] = document.querySelector("#aws-key").value.split(":")
+      const ec2 = new AWS.EC2({
+        region: "eu-central-1",
+        apiVersion: '2014-10-01',
+        credentials: { accessKeyId: id, secretAccessKey: secret, region: "eu-central-1" }
+      })
+      ec2.startInstances({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, function(err, data) {
+        console.log(err || data)
+        document.querySelector("#result").innerHTML = err
+          ? "Error! Look in the console.<br/>" + err
+          : "Success!<br/>You may have to wait 30-60 seconds."
+      })
+    })
+  </script>
+</body>
+</html>
