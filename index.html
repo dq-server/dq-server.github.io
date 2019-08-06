@@ -40,10 +40,14 @@
 
   <script src="https://sdk.amazonaws.com/js/aws-sdk-2.502.0.min.js"></script>
   <script>
+    document.querySelector("#aws-key").value = window.localStorage.getItem("aws-key")
+
     document.querySelector("#start-minecraft").addEventListener("submit", e => {
       e.preventDefault()
 
-      const [id, secret] = document.querySelector("#aws-key").value.split(":")
+      const awsKey = document.querySelector("#aws-key").value
+      window.localStorage.setItem("aws-key", awsKey)
+      const [id, secret] = awsKey.split(":")
       const ec2 = new AWS.EC2({
         region: "eu-central-1",
         apiVersion: '2014-10-01',
