@@ -28,12 +28,6 @@ class App extends React.Component {
     this.setState({ shouldAskForAwsKey: false })
   }
 
-  updateMachineStatus = () => {
-    this.getApi().describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, function(err, data) {
-      console.log(err || data)
-    })
-  }
-
   render() {
     return (
       <React.Fragment>
@@ -46,7 +40,7 @@ class App extends React.Component {
                 onCancel={this.cancelAwsKeyChange}
               />
             : <React.Fragment>
-                <StatusList />
+                <StatusList api={this.getApi()} />
                 <Actions api={this.getApi()} />
               </React.Fragment>
         }
@@ -130,7 +124,7 @@ class KeyForm extends React.Component {
             {
               this.props.canCancel &&
               <div className="form-group">
-                <button class="btn btn-secondary" onClick={this.props.onCancel}>Cancel</button>
+                <button className="btn btn-secondary" onClick={this.props.onCancel}>Cancel</button>
               </div>
             }
             { this.state.showValidationError && <div className="text-danger mt-2">Invalid key</div> }
@@ -142,6 +136,60 @@ class KeyForm extends React.Component {
 }
 
 class StatusList extends React.Component {
+  state = {
+    updateTimerId: null,
+    isMachineUpdateInProgress: true,
+    machineStatus: "secondary",
+    machineMessage: "Updating..."
+  }
+
+  updateMachineStatus = () => {
+    this.setState({
+      isMachineUpdateInProgress: true,
+      machineStatus: "secondary",
+      machineMessage: "Updating..."
+    })
+
+    this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, (err, data) => {
+      console.log(err || data)
+
+      const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
+
+      let status, message
+
+      if (rawState === "running") {
+        status = "success"
+        message = "Online"
+      } else if (rawState === "pending") {
+        status = "warning"
+        message = "Starting up"
+      } else {
+        status = "red"
+        message = rawState.replace("-", " ")
+      }
+
+      this.setState({
+        isMachineUpdateInProgress: false,
+        machineStatus: status,
+        machineMessage: (err && err.message) || message
+      })
+    })
+  }
+
+  updateAll = () => {
+    this.updateMachineStatus()
+  }
+
+  componentDidMount() {
+    this.updateAll()
+    const updateTimerId = setInterval(this.updateAll, 60000)
+    this.setState({ updateTimerId })
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.state.updateTimerId)
+  }
+
   render() {
     return (
       <div className="container">
@@ -156,15 +204,15 @@ class StatusList extends React.Component {
               <ul className="list-group list-group-flush">
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>Underlying machine</span>
-                  <span className="text-success">Online</span>
+                  <span className={`text-${this.state.machineStatus} text-capitalize`}>{this.state.machineMessage}</span>
                 </li>
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>Minecraft server</span>
-                  <span className="text-success">Online</span>
+                  <span className="text-success text-capitalize">Online</span>
                 </li>
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>World map</span>
-                  <span className="text-success">Online</span>
+                  <span className="text-success text-capitalize">Online</span>
                 </li>
               </ul>
             </div>
