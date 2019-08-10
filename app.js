@@ -219,7 +219,7 @@ class StatusList extends React.Component {
       minecraftMessage: "Updating..."
     })
 
-    fetch('http://minecraft.deltaidea.com:5000/minecraft-status').then(r => r.json()).then(data => {
+    fetch('https://minecraft.deltaidea.com:5000/minecraft-status').then(r => r.json()).then(data => {
       console.log(data)
       this.setState({
         isMinecraftUpdateInProgress: false,
@@ -243,7 +243,7 @@ class StatusList extends React.Component {
       mapMessage: "Updating..."
     })
 
-    fetch('http://minecraft.deltaidea.com:5000/map-status').then(r => r.json()).then(data => {
+    fetch('https://minecraft.deltaidea.com:5000/map-status').then(r => r.json()).then(data => {
       console.log("Map status:", data)
       this.setState({
         isMapUpdateInProgress: false,
