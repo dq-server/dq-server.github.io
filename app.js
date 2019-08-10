@@ -2,7 +2,7 @@ class App extends React.Component {
   state = {
     shouldAskForAwsKey: !window.localStorage["aws-key"],
     awsKey: window.localStorage["aws-key"] || "",
-    updateTimerId: null
+    isUpdatingStatus: true
   }
 
   getApi = () => {
@@ -28,6 +28,10 @@ class App extends React.Component {
     this.setState({ shouldAskForAwsKey: false })
   }
 
+  setUpdating = isUpdatingStatus => {
+    this.setState({ isUpdatingStatus })
+  }
+
   render() {
     return (
       <React.Fragment>
@@ -40,8 +44,8 @@ class App extends React.Component {
                 onCancel={this.cancelAwsKeyChange}
               />
             : <React.Fragment>
-                <StatusList api={this.getApi()} />
-                <Actions api={this.getApi()} />
+                <StatusList api={this.getApi()} setUpdating={this.setUpdating} />
+                <Actions api={this.getApi()} isUpdatingStatus={this.state.isUpdatingStatus} />
               </React.Fragment>
         }
       </React.Fragment>
@@ -149,6 +153,18 @@ class StatusList extends React.Component {
     mapMessage: "Updating..."
   }
 
+  updateUpstreamUpdateFlag = () => {
+    if (
+      !this.state.isMachineUpdateInProgress &&
+      !this.state.isMinecraftUpdateInProgress &&
+      !this.state.isMapUpdateInProgress
+    ) {
+      this.props.setUpdating(false)
+    } else {
+      this.props.setUpdating(true)
+    }
+  }
+
   updateMachineStatus = () => {
     this.setState({
       isMachineUpdateInProgress: true,
@@ -178,7 +194,7 @@ class StatusList extends React.Component {
         isMachineUpdateInProgress: false,
         machineStatus: status,
         machineMessage: (err && err.message) || message
-      })
+      }, this.updateUpstreamUpdateFlag)
     })
   }
 
@@ -195,14 +211,14 @@ class StatusList extends React.Component {
         isMinecraftUpdateInProgress: false,
         minecraftStatus: "success",
         minecraftMessage: "Online"
-      })
+      }, this.updateUpstreamUpdateFlag)
     }).catch(err => {
       console.error(err)
       this.setState({
         isMinecraftUpdateInProgress: false,
         minecraftStatus: "danger",
         minecraftMessage: err.message
-      })
+      }, this.updateUpstreamUpdateFlag)
     })
   }
 
@@ -219,14 +235,14 @@ class StatusList extends React.Component {
         isMapUpdateInProgress: false,
         mapStatus: data.status === 200 ? "success" : "danger",
         mapMessage: data.status === 200 ? "Online" : r.statusText
-      })
+      }, this.updateUpstreamUpdateFlag)
     }).catch(err => {
       console.error(err)
       this.setState({
         isMapUpdateInProgress: false,
         mapStatus: "danger",
         mapMessage: err.message
-      })
+      }, this.updateUpstreamUpdateFlag)
     })
   }
 
@@ -234,6 +250,7 @@ class StatusList extends React.Component {
     this.updateMachineStatus()
     this.updateMinecraftStatus()
     this.updateMapStatus()
+    this.updateUpstreamUpdateFlag()
   }
 
   componentDidMount() {
@@ -246,17 +263,32 @@ class StatusList extends React.Component {
     clearInterval(this.state.updateTimerId)
   }
 
+  getCardBorderColor = () => {
+    const s1 = this.state.machineStatus
+    const s2 = this.state.minecraftStatus
+    const s3 = this.state.mapStatus
+
+    let color = "secondary"
+    if (s1 === "success" && s2 === "success" && s3 === "success") color = "success"
+    if (s1 === "warning" || s2 === "warning" || s3 === "warning") color = "warning"
+    if (s1 === "danger" || s2 === "danger" || s3 === "danger") color = "danger"
+
+    return color
+  }
+
+  getCardHeader = () => {
+    if (this.state.minecraftStatus === "success") return "Minecraft running"
+    if (this.state.machineStatus !== "success") return "Machine down"
+    return "Minecraft down"
+  }
+
   render() {
     return (
       <div className="container">
         <div className="row justify-content-center my-4 my-md-5">
           <div className="col-md-8">
-            <div className="card border-success">
-              <h4 className="card-header">Minecraft running</h4>
-              <div className="card-body">
-                <p className="card-text">Everything seems to be operational.</p>
-                <p className="card-text">Keep in mind that the server will automatically shut down after 15&nbsp;minutes of inactivity.</p>
-              </div>
+            <div className={`card border-${this.getCardBorderColor()}`}>
+              <h4 className="card-header">{this.getCardHeader()}</h4>
               <ul className="list-group list-group-flush">
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>Underlying machine</span>
@@ -310,12 +342,12 @@ class Actions extends React.Component {
                 <button
                   type="button"
                   className="card-link btn btn-secondary"
-                  disabled={!this.state.isActionInProgress ? undefined : "disabled"}
+                  disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
                 >Render map</button>
                 <button
                   type="button"
                   className="card-link btn btn-outline-warning"
-                  disabled={!this.state.isActionInProgress ? undefined : "disabled"}
+                  disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
                   onClick={this.startInstance}
                 >Stop the machine</button>
                 {this.state.isActionInProgress && <div className="mt-3 text-muted">Wait...</div>}
