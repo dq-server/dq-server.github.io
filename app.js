@@ -362,18 +362,6 @@ class Actions extends React.Component {
                     onClick={this.startInstance}
                   >Start the machine</button>
                 }
-                <button
-                  type="button"
-                  className="card-link btn btn-secondary mr-3"
-                  disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
-                  {...{
-                    "data-toggle": "popover",
-                    "data-placement": "top",
-                    "data-trigger": "hover",
-                    "title": "Can take up to 30-60 minutes",
-                    "data-content": "This button creates a fast virtual machine, copies over the map files (8 GB), updates the render (15-30 min), and syncs back the files. You can monitor the progress in the Minecraft game chat."
-                  }}
-                >Render map</button>
                 {
                   this.props.machineStatus === "success" &&
                   <span>The server will automatically shut down after 15 minutes of inactivity.</span>
