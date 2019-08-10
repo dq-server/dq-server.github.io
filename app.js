@@ -182,7 +182,7 @@ class StatusList extends React.Component {
       machineMessage: "Updating..."
     })
 
-    this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, (err, data) => {
+    this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"], IncludeAllInstances: true }, (err, data) => {
       console.log(err || data)
 
       const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
