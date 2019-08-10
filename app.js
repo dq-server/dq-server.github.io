@@ -2,7 +2,8 @@ class App extends React.Component {
   state = {
     shouldAskForAwsKey: !window.localStorage["aws-key"],
     awsKey: window.localStorage["aws-key"] || "",
-    isUpdatingStatus: true
+    isUpdatingStatus: true,
+    machineStatus: "secondary"
   }
 
   getApi = () => {
@@ -32,6 +33,15 @@ class App extends React.Component {
     this.setState({ isUpdatingStatus })
   }
 
+  setMachineStatus = machineStatus => {
+    this.setState({ machineStatus })
+  }
+
+  componentDidUpdate() {
+    $('[data-toggle="tooltip"]').tooltip()
+    $('[data-toggle="popover"]').popover()
+  }
+
   render() {
     return (
       <React.Fragment>
@@ -44,8 +54,8 @@ class App extends React.Component {
                 onCancel={this.cancelAwsKeyChange}
               />
             : <React.Fragment>
-                <StatusList api={this.getApi()} setUpdating={this.setUpdating} />
-                <Actions api={this.getApi()} isUpdatingStatus={this.state.isUpdatingStatus} />
+                <StatusList api={this.getApi()} setUpdating={this.setUpdating} setMachineStatus={this.setMachineStatus} />
+                <Actions api={this.getApi()} isUpdatingStatus={this.state.isUpdatingStatus} machineStatus={this.state.machineStatus} />
               </React.Fragment>
         }
       </React.Fragment>
@@ -185,9 +195,12 @@ class StatusList extends React.Component {
       } else if (rawState === "pending") {
         status = "warning"
         message = "Starting up"
+      } else if (rawState === "shutting-down" || rawState === "stopping") {
+        status = "warning"
+        message = "Shutting down"
       } else {
         status = "danger"
-        message = rawState.replace("-", " ")
+        message = "Offline"
       }
 
       this.setState({
@@ -195,6 +208,7 @@ class StatusList extends React.Component {
         machineStatus: status,
         machineMessage: (err && err.message) || message
       }, this.updateUpstreamUpdateFlag)
+      this.props.setMachineStatus(status)
     })
   }
 
@@ -339,17 +353,31 @@ class Actions extends React.Component {
             <div className="card text-white bg-dark mb-3">
               <h4 className="card-header">Actions</h4>
               <div className="card-body">
+                {
+                  this.props.machineStatus === "danger" &&
+                  <button
+                    type="button"
+                    className="card-link btn btn-primary"
+                    disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
+                    onClick={this.startInstance}
+                  >Start the machine</button>
+                }
                 <button
                   type="button"
-                  className="card-link btn btn-secondary"
+                  className="card-link btn btn-secondary mr-3"
                   disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
+                  {...{
+                    "data-toggle": "popover",
+                    "data-placement": "top",
+                    "data-trigger": "hover",
+                    "title": "Can take up to 30-60 minutes",
+                    "data-content": "This button creates a fast virtual machine, copies over the map files (8 GB), updates the render (15-30 min), and syncs back the files. You can monitor the progress in the Minecraft game chat."
+                  }}
                 >Render map</button>
-                <button
-                  type="button"
-                  className="card-link btn btn-outline-warning"
-                  disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
-                  onClick={this.startInstance}
-                >Stop the machine</button>
+                {
+                  this.props.machineStatus === "success" &&
+                  <span>The server will automatically shut down after 15 minutes of inactivity.</span>
+                }
                 {this.state.isActionInProgress && <div className="mt-3 text-muted">Wait...</div>}
                 {
                   this.state.actionResultMessage && !this.state.isActionInProgress &&
