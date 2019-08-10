@@ -140,7 +140,13 @@ class StatusList extends React.Component {
     updateTimerId: null,
     isMachineUpdateInProgress: true,
     machineStatus: "secondary",
-    machineMessage: "Updating..."
+    machineMessage: "Updating...",
+    isMinecraftUpdateInProgress: true,
+    minecraftStatus: "secondary",
+    minecraftMessage: "Updating...",
+    isMapUpdateInProgress: true,
+    mapStatus: "secondary",
+    mapMessage: "Updating..."
   }
 
   updateMachineStatus = () => {
@@ -164,7 +170,7 @@ class StatusList extends React.Component {
         status = "warning"
         message = "Starting up"
       } else {
-        status = "red"
+        status = "danger"
         message = rawState.replace("-", " ")
       }
 
@@ -176,8 +182,58 @@ class StatusList extends React.Component {
     })
   }
 
+  updateMinecraftStatus = () => {
+    this.setState({
+      isMinecraftUpdateInProgress: true,
+      minecraftStatus: "secondary",
+      minecraftMessage: "Updating..."
+    })
+
+    fetch('http://minecraft.deltaidea.com:5000/minecraft-status').then(r => r.json()).then(data => {
+      console.log(data)
+      this.setState({
+        isMinecraftUpdateInProgress: false,
+        minecraftStatus: "success",
+        minecraftMessage: "Online"
+      })
+    }).catch(err => {
+      console.error(err)
+      this.setState({
+        isMinecraftUpdateInProgress: false,
+        minecraftStatus: "danger",
+        minecraftMessage: err.message
+      })
+    })
+  }
+
+  updateMapStatus = () => {
+    this.setState({
+      isMapUpdateInProgress: true,
+      mapStatus: "secondary",
+      mapMessage: "Updating..."
+    })
+
+    fetch('http://minecraft.deltaidea.com:5000/map-status').then(r => r.json()).then(data => {
+      console.log("Map status:", data)
+      this.setState({
+        isMapUpdateInProgress: false,
+        mapStatus: data.status === 200 ? "success" : "danger",
+        mapMessage: data.status === 200 ? "Online" : r.statusText
+      })
+    }).catch(err => {
+      console.error(err)
+      this.setState({
+        isMapUpdateInProgress: false,
+        mapStatus: "danger",
+        mapMessage: err.message
+      })
+    })
+  }
+
   updateAll = () => {
     this.updateMachineStatus()
+    this.updateMinecraftStatus()
+    this.updateMapStatus()
   }
 
   componentDidMount() {
@@ -208,11 +264,11 @@ class StatusList extends React.Component {
                 </li>
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>Minecraft server</span>
-                  <span className="text-success text-capitalize">Online</span>
+                  <span className={`text-${this.state.minecraftStatus} text-capitalize`}>{this.state.minecraftMessage}</span>
                 </li>
                 <li className="list-group-item d-flex justify-content-between align-items-center">
                   <span>World map</span>
-                  <span className="text-success text-capitalize">Online</span>
+                  <span className={`text-${this.state.mapStatus} text-capitalize`}>{this.state.mapMessage}</span>
                 </li>
               </ul>
             </div>
