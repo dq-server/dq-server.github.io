@@ -1,10 +1,55 @@
 class App extends React.Component {
+  state = {
+    shouldAskForAwsKey: !window.localStorage["aws-key"],
+    awsKey: window.localStorage["aws-key"] || "",
+    updateTimerId: null
+  }
+
+  getApi = () => {
+    const [id, secret] = this.state.awsKey.split(":")
+
+    return new AWS.EC2({
+      region: "eu-central-1",
+      apiVersion: "2016-11-15",
+      credentials: { accessKeyId: id, secretAccessKey: secret, region: "eu-central-1" }
+    })
+  }
+
+  askForAwsKey = () => {
+    this.setState({ shouldAskForAwsKey: true })
+  }
+
+  changeAwsKey = awsKey => {
+    window.localStorage["aws-key"] = awsKey
+    this.setState({ shouldAskForAwsKey: false, awsKey })
+  }
+
+  cancelAwsKeyChange = () => {
+    this.setState({ shouldAskForAwsKey: false })
+  }
+
+  updateMachineStatus = () => {
+    this.getApi().describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, function(err, data) {
+      console.log(err || data)
+    })
+  }
+
   render() {
     return (
       <React.Fragment>
-        <Navbar />
-        <StatusList />
-        <Actions />
+        <Navbar canAskForAwsKey={!this.state.shouldAskForAwsKey} askForAwsKey={this.askForAwsKey} />
+        {
+          this.state.shouldAskForAwsKey
+            ? <KeyForm
+                onChange={this.changeAwsKey}
+                canCancel={!!this.state.awsKey}
+                onCancel={this.cancelAwsKeyChange}
+              />
+            : <React.Fragment>
+                <StatusList />
+                <Actions api={this.getApi()} />
+              </React.Fragment>
+        }
       </React.Fragment>
     )
   }
@@ -35,8 +80,63 @@ class Navbar extends React.Component {
               <a className="nav-link" href="https://github.com/dq-server">GitHub</a>
             </li>
           </ul>
+          {
+            this.props.canAskForAwsKey &&
+            <button className="btn btn-link" onClick={this.props.askForAwsKey}>Change AWS Key</button>
+          }
         </div>
       </nav>
+    )
+  }
+}
+
+class KeyForm extends React.Component {
+  state = {
+    value: "",
+    showValidationError: false,
+  }
+
+  handleChange = event => {
+    this.setState({ value: event.target.value, showValidationError: false })
+  }
+
+  handleSubmit = event => {
+    event.preventDefault()
+
+    if (/.+:.+/.test(this.state.value)) {
+      this.props.onChange(this.state.value)
+    } else {
+      this.setState({ showValidationError: true })
+    }
+  }
+
+  render() {
+    return (
+      <div className="container">
+        <div className="row justify-content-center my-4 my-md-5">
+          <div className="col-md-8">
+            <form onSubmit={this.handleSubmit}>
+              <div className="form-group">
+                <input
+                  type="password"
+                  className="form-control bg-secondary text-white"
+                  placeholder="AWS Key"
+                  autoComplete="off"
+                  value={this.value}
+                  onChange={this.handleChange}
+                />
+              </div>
+            </form>
+            {
+              this.props.canCancel &&
+              <div className="form-group">
+                <button class="btn btn-secondary" onClick={this.props.onCancel}>Cancel</button>
+              </div>
+            }
+            { this.state.showValidationError && <div className="text-danger mt-2">Invalid key</div> }
+          </div>
+        </div>
+      </div>
     )
   }
 }
@@ -77,28 +177,15 @@ class StatusList extends React.Component {
 
 class Actions extends React.Component {
   state = {
-    awsKey: window.localStorage["aws-key"] || "",
     actionResultMessage: "",
     wasActionSuccessful: false,
     isActionInProgress: false
   }
 
-  handleAwsKeyChange = event => {
-    this.setState({ awsKey: event.target.value })
-  }
-
   startInstance = event => {
-    event.preventDefault()
     this.setState({ isActionInProgress: true })
 
-    window.localStorage["aws-key"] = this.state.awsKey
-    const [id, secret] = this.state.awsKey.split(":")
-    const ec2 = new AWS.EC2({
-      region: "eu-central-1",
-      apiVersion: '2014-10-01',
-      credentials: { accessKeyId: id, secretAccessKey: secret, region: "eu-central-1" }
-    })
-    ec2.startInstances({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, (err, data) => {
+    this.props.api.startInstances({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, (err, data) => {
       console.log(err || data)
       this.setState({
         isActionInProgress: false,
@@ -114,33 +201,25 @@ class Actions extends React.Component {
         <div className="row justify-content-center my-4 my-md-5">
           <div className="col-md-8">
             <div className="card text-white bg-dark mb-3">
-              <div className="card-header">Actions</div>
+              <h4 className="card-header">Actions</h4>
               <div className="card-body">
-                <div className="form-group">
-                  <input
-                    type="password"
-                    className="form-control bg-secondary text-white"
-                    placeholder="AWS Key"
-                    autoComplete="off"
-                    value={this.state.awsKey}
-                    onChange={this.handleAwsKeyChange}
-                  />
-                </div>
                 <button
                   type="button"
                   className="card-link btn btn-secondary"
-                  disabled={(/.+:.+/.test(this.state.awsKey) && !this.state.isActionInProgress) ? undefined : "disabled"}
+                  disabled={!this.state.isActionInProgress ? undefined : "disabled"}
                 >Render map</button>
                 <button
                   type="button"
                   className="card-link btn btn-outline-warning"
-                  disabled={(/.+:.+/.test(this.state.awsKey) && !this.state.isActionInProgress) ? undefined : "disabled"}
+                  disabled={!this.state.isActionInProgress ? undefined : "disabled"}
                   onClick={this.startInstance}
                 >Stop the machine</button>
                 {this.state.isActionInProgress && <div className="mt-3 text-muted">Wait...</div>}
                 {
                   this.state.actionResultMessage && !this.state.isActionInProgress &&
-                  <div className={`mt-3 ${this.state.wasActionSuccessful ? "text-success" : "text-danger"}`}>{this.state.actionResultMessage}</div>
+                  <div className={`mt-3 ${this.state.wasActionSuccessful ? "text-success" : "text-danger"}`}>
+                    {this.state.actionResultMessage}
+                  </div>
                 }
               </div>
             </div>
