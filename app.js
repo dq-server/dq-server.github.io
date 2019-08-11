@@ -292,8 +292,9 @@ class StatusList extends React.Component {
 
   getCardHeader = () => {
     if (this.state.minecraftStatus === "success") return "Minecraft running"
-    if (this.state.machineStatus !== "success") return "Machine down"
-    return "Minecraft down"
+    if (this.state.machineStatus === "danger") return "Machine down"
+    if (this.state.minecraftStatus === "warning") return "No one's playing"
+    return "Systems health"
   }
 
   render() {
