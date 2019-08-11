@@ -223,8 +223,8 @@ class StatusList extends React.Component {
       console.log(data)
       this.setState({
         isMinecraftUpdateInProgress: false,
-        minecraftStatus: "success",
-        minecraftMessage: "Online"
+        minecraftStatus: data.players.online > 0 ? "success" : "warning",
+        minecraftMessage: data.players.online > 0 ? "Online" : "Empty"
       }, this.updateUpstreamUpdateFlag)
     }).catch(err => {
       console.error(err)
