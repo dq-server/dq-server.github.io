@@ -339,7 +339,7 @@ class Actions extends React.Component {
       console.log(err || data)
       this.setState({
         isActionInProgress: false,
-        actionResultMessage: err.message || "The server is starting up. You may have to wait 30-60 seconds.",
+        actionResultMessage: (err && err.message) || "The server is starting up. You may have to wait 30-60 seconds.",
         wasActionSuccessful: !err
       })
     })
