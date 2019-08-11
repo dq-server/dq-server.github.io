@@ -176,49 +176,54 @@ class StatusList extends React.Component {
   }
 
   updateMachineStatus = () => {
-    this.setState({
-      isMachineUpdateInProgress: true,
-      machineStatus: "secondary",
-      machineMessage: "Updating..."
-    })
-
-    this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"], IncludeAllInstances: true }, (err, data) => {
-      console.log(err || data)
-
-      const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
-
-      let status, message
-
-      if (rawState === "running") {
-        status = "success"
-        message = "Online"
-      } else if (rawState === "pending") {
-        status = "warning"
-        message = "Starting up"
-      } else if (rawState === "shutting-down" || rawState === "stopping") {
-        status = "warning"
-        message = "Shutting down"
-      } else {
-        status = "danger"
-        message = "Offline"
-      }
-
+    return new Promise((resolve, reject) => {
       this.setState({
-        isMachineUpdateInProgress: false,
-        machineStatus: status,
-        machineMessage: (err && err.message) || message
+        isMachineUpdateInProgress: true,
+        machineStatus: "secondary",
+        machineMessage: "Updating...",
+        isMinecraftUpdateInProgress: true,
+        minecraftStatus: "secondary",
+        minecraftMessage: "Updating...",
+        isMapUpdateInProgress: true,
+        mapStatus: "secondary",
+        mapMessage: "Updating..."
       }, this.updateUpstreamUpdateFlag)
-      this.props.setMachineStatus(status)
+
+      this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"], IncludeAllInstances: true }, (err, data) => {
+        console.log(err || data)
+
+        const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
+
+        let status, message
+
+        if (rawState === "running") {
+          status = "success"
+          message = "Online"
+        } else if (rawState === "pending") {
+          status = "warning"
+          message = "Starting up"
+        } else if (rawState === "shutting-down" || rawState === "stopping") {
+          status = "warning"
+          message = "Shutting down"
+        } else {
+          status = "danger"
+          message = "Offline"
+        }
+
+        this.setState({
+          isMachineUpdateInProgress: false,
+          machineStatus: status,
+          machineMessage: (err && err.message) || message
+        })
+        this.props.setMachineStatus(status)
+
+        if (err || status !== "success") reject()
+        else resolve()
+      })
     })
   }
 
   updateMinecraftStatus = () => {
-    this.setState({
-      isMinecraftUpdateInProgress: true,
-      minecraftStatus: "secondary",
-      minecraftMessage: "Updating..."
-    })
-
     fetch("https://minecraft.deltaidea.com:5000/minecraft-status", { cache: "no-store" }).then(r => r.json()).then(data => {
       console.log(data)
       this.setState({
@@ -237,12 +242,6 @@ class StatusList extends React.Component {
   }
 
   updateMapStatus = () => {
-    this.setState({
-      isMapUpdateInProgress: true,
-      mapStatus: "secondary",
-      mapMessage: "Updating..."
-    })
-
     fetch("https://minecraft.deltaidea.com:5000/map-status", { cache: "no-store" }).then(r => r.json()).then(data => {
       console.log("Map status:", data)
       this.setState({
@@ -262,9 +261,24 @@ class StatusList extends React.Component {
 
   updateAll = () => {
     this.updateMachineStatus()
-    this.updateMinecraftStatus()
-    this.updateMapStatus()
-    this.updateUpstreamUpdateFlag()
+      .catch(() => {
+        this.setState({
+          isMinecraftUpdateInProgress: false,
+          minecraftStatus: "danger",
+          minecraftMessage: "Offline",
+          isMapUpdateInProgress: false,
+          mapStatus: "danger",
+          mapMessage: "Offline"
+        }, this.updateUpstreamUpdateFlag)
+
+        return true
+      })
+      .then((wasErrorHandled) => {
+        if (!wasErrorHandled) {
+          this.updateMinecraftStatus()
+          this.updateMapStatus()
+        }
+      })
   }
 
   componentDidMount() {
