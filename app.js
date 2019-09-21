@@ -379,7 +379,7 @@ class Actions extends React.Component {
                 }
                 {
                   this.props.machineStatus === "success" &&
-                  <span>The server will automatically shut down after 15 minutes of inactivity.</span>
+                  <span>The server will stay online indefinitely. Write <code>--system-shutdown</code> in the game chat to stop the instance.</span>
                 }
                 {this.state.isActionInProgress && <div className="mt-3 text-muted">Wait...</div>}
                 {
