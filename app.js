@@ -189,7 +189,7 @@ class StatusList extends React.Component {
         mapMessage: "Updating..."
       }, this.updateUpstreamUpdateFlag)
 
-      this.props.api.describeInstanceStatus({ InstanceIds: ["i-0c6cff9ad722e8bfe"], IncludeAllInstances: true }, (err, data) => {
+      this.props.api.describeInstanceStatus({ InstanceIds: ["i-062dbff0aacf41af1"], IncludeAllInstances: true }, (err, data) => {
         console.log(err || data)
 
         const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
@@ -350,7 +350,7 @@ class Actions extends React.Component {
   startInstance = event => {
     this.setState({ isActionInProgress: true })
 
-    this.props.api.startInstances({ InstanceIds: ["i-0c6cff9ad722e8bfe"]}, (err, data) => {
+    this.props.api.startInstances({ InstanceIds: ["i-062dbff0aacf41af1"]}, (err, data) => {
       console.log(err || data)
       this.setState({
         isActionInProgress: false,
