@@ -9,11 +9,42 @@ class App extends React.Component {
   getApi = () => {
     const [id, secret] = this.state.awsKey.split(":")
 
-    return new AWS.EC2({
+    const awsApi = new AWS.EC2({
       region: "eu-central-1",
       apiVersion: "2016-11-15",
       credentials: { accessKeyId: id, secretAccessKey: secret, region: "eu-central-1" }
     })
+
+    return {
+      getInstanceStatus: () =>
+        new Promise((resolve, reject) => {
+          awsApi.describeInstanceStatus({ InstanceIds: ["i-062dbff0aacf41af1"], IncludeAllInstances: true }, (err, data) => {
+            if (err) reject(err)
+            else resolve(data.InstanceStatuses[0].InstanceState.Name)
+          })
+        }),
+
+      getMinecraftStatus: () =>
+        fetch("https://minecraft.deltaidea.com:5000/minecraft-status", { cache: "no-store" }).then(r => r.json()),
+
+      getMapStatus: () =>
+        fetch("https://minecraft.deltaidea.com:5000/map-status", { cache: "no-store" }).then(r => r.json()),
+
+      startInstance: () =>
+        new Promise((resolve, reject) => {
+          awsApi.startInstances({ InstanceIds: ["i-062dbff0aacf41af1"]}, (err, data) => {
+            if (err) reject(err)
+            else resolve(data)
+          })
+        }),
+
+      stopInstance: () =>
+        fetch("https://minecraft.deltaidea.com:5000/system-shutdown", {
+          method: "POST",
+          cache: "no-store",
+          body: `key=${this.state.awsKey}`
+        }).then(r => r.json()),
+    }
   }
 
   askForAwsKey = () => {
@@ -175,88 +206,86 @@ class StatusList extends React.Component {
     }
   }
 
-  updateMachineStatus = () => {
-    return new Promise((resolve, reject) => {
-      this.setState({
-        isMachineUpdateInProgress: true,
-        machineStatus: "secondary",
-        machineMessage: "Updating...",
-        isMinecraftUpdateInProgress: true,
-        minecraftStatus: "secondary",
-        minecraftMessage: "Updating...",
-        isMapUpdateInProgress: true,
-        mapStatus: "secondary",
-        mapMessage: "Updating..."
-      }, this.updateUpstreamUpdateFlag)
+  updateMachineStatus = async () => {
+    this.setState({
+      isMachineUpdateInProgress: true,
+      machineStatus: "secondary",
+      machineMessage: "Updating...",
+      isMinecraftUpdateInProgress: true,
+      minecraftStatus: "secondary",
+      minecraftMessage: "Updating...",
+      isMapUpdateInProgress: true,
+      mapStatus: "secondary",
+      mapMessage: "Updating..."
+    }, this.updateUpstreamUpdateFlag)
 
-      this.props.api.describeInstanceStatus({ InstanceIds: ["i-062dbff0aacf41af1"], IncludeAllInstances: true }, (err, data) => {
-        console.log(err || data)
+    let rawStatus, err
+    try {
+      rawStatus = await this.props.api.getInstanceStatus()
+    } catch (_err) {
+      err = _err
+    }
 
-        const rawState = !err && data.InstanceStatuses[0].InstanceState.Name
+    let status, message
 
-        let status, message
+    if (rawStatus === "running") {
+      status = "success"
+      message = "Online"
+    } else if (rawStatus === "pending") {
+      status = "warning"
+      message = "Starting up"
+    } else if (rawStatus === "shutting-down" || rawStatus === "stopping") {
+      status = "warning"
+      message = "Shutting down"
+    } else {
+      status = "danger"
+      message = "Offline"
+    }
 
-        if (rawState === "running") {
-          status = "success"
-          message = "Online"
-        } else if (rawState === "pending") {
-          status = "warning"
-          message = "Starting up"
-        } else if (rawState === "shutting-down" || rawState === "stopping") {
-          status = "warning"
-          message = "Shutting down"
-        } else {
-          status = "danger"
-          message = "Offline"
-        }
-
-        this.setState({
-          isMachineUpdateInProgress: false,
-          machineStatus: status,
-          machineMessage: (err && err.message) || message
-        })
-        this.props.setMachineStatus(status)
-
-        if (err || status !== "success") reject()
-        else resolve()
-      })
+    this.setState({
+      isMachineUpdateInProgress: false,
+      machineStatus: status,
+      machineMessage: (err && err.message) || message
     })
+    this.props.setMachineStatus(status)
+
+    if (status !== "success") throw new Error()
   }
 
-  updateMinecraftStatus = () => {
-    fetch("https://minecraft.deltaidea.com:5000/minecraft-status", { cache: "no-store" }).then(r => r.json()).then(data => {
-      console.log(data)
+  updateMinecraftStatus = async () => {
+    try {
+      const data = await this.props.api.getMinecraftStatus()
       this.setState({
         isMinecraftUpdateInProgress: false,
         minecraftStatus: data.players.online > 0 ? "success" : "warning",
         minecraftMessage: data.players.online > 0 ? "Online" : "Empty"
       }, this.updateUpstreamUpdateFlag)
-    }).catch(err => {
+    } catch (err) {
       console.error(err)
       this.setState({
         isMinecraftUpdateInProgress: false,
         minecraftStatus: "danger",
         minecraftMessage: err.message
       }, this.updateUpstreamUpdateFlag)
-    })
+    }
   }
 
-  updateMapStatus = () => {
-    fetch("https://minecraft.deltaidea.com:5000/map-status", { cache: "no-store" }).then(r => r.json()).then(data => {
-      console.log("Map status:", data)
+  updateMapStatus = async () => {
+    try {
+      const data = await this.props.api.getMapStatus()
       this.setState({
         isMapUpdateInProgress: false,
         mapStatus: data.status === 200 ? "success" : "danger",
         mapMessage: data.status === 200 ? "Online" : r.statusText
       }, this.updateUpstreamUpdateFlag)
-    }).catch(err => {
+    } catch (err) {
       console.error(err)
       this.setState({
         isMapUpdateInProgress: false,
         mapStatus: "danger",
         mapMessage: err.message
       }, this.updateUpstreamUpdateFlag)
-    })
+    }
   }
 
   updateAll = () => {
@@ -347,17 +376,42 @@ class Actions extends React.Component {
     isActionInProgress: false
   }
 
-  startInstance = event => {
+  startInstance = async event => {
     this.setState({ isActionInProgress: true })
 
-    this.props.api.startInstances({ InstanceIds: ["i-062dbff0aacf41af1"]}, (err, data) => {
-      console.log(err || data)
+    try {
+      await this.props.api.startInstance()
       this.setState({
         isActionInProgress: false,
-        actionResultMessage: (err && err.message) || "The server is starting up. You may have to wait 30-60 seconds.",
-        wasActionSuccessful: !err
+        wasActionSuccessful: true,
+        actionResultMessage: "The server is starting up. You may have to wait 30-60 seconds."
       })
-    })
+    } catch (e) {
+      this.setState({
+        isActionInProgress: false,
+        wasActionSuccessful: false,
+        actionResultMessage: err && err.message
+      })
+    }
+  }
+
+  stopInstance = async event => {
+    this.setState({ isActionInProgress: true })
+
+    try {
+      const result = await this.props.api.stopInstance()
+      this.setState({
+        isActionInProgress: false,
+        wasActionSuccessful: result.result == "success",
+        actionResultMessage: result.message
+      })
+    } catch (err) {
+      this.setState({
+        isActionInProgress: false,
+        wasActionSuccessful: false,
+        actionResultMessage: err && err.message
+      })
+    }
   }
 
   render() {
@@ -379,7 +433,18 @@ class Actions extends React.Component {
                 }
                 {
                   this.props.machineStatus === "success" &&
-                  <span>The server will stay online indefinitely. Write <code>--system-shutdown</code> in the game chat to stop the instance.</span>
+                  <React.Fragment>
+                    <div className="mb-3">
+                      The server will stay online indefinitely. Write <code>--system-shutdown</code> in the game
+                      chat or press the button below to stop the instance.
+                    </div>
+                    <button
+                      type="button"
+                      className="card-link btn btn-primary"
+                      disabled={!this.state.isActionInProgress && !this.props.isUpdatingStatus ? undefined : "disabled"}
+                      onClick={this.stopInstance}
+                    >Stop the machine</button>
+                  </React.Fragment>
                 }
                 {this.state.isActionInProgress && <div className="mt-3 text-muted">Wait...</div>}
                 {
